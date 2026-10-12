@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "creador": {
+      "type": "http",
+      "url": "https://wd.facundohernandez.dev/mcp",
+      "headers": {
+        "Authorization": "Bearer ${MCP_API_KEY}"
+      }
+    }
+  }
+}

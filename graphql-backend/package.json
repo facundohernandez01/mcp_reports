@@ -1,0 +1,29 @@
+{
+  "name": "creador-graphql",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@pothos/core": "^4.4.0",
+    "graphql": "^16.10.0",
+    "graphql-yoga": "^5.9.0",
+    "jose": "^6.0.0",
+    "mysql2": "^3.11.0",
+    "nodemailer": "^10.0.15",
+    "odbc": "^2.5.4",
+    "pg": "^8.13.0",
+    "tedious": "^20.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "packageManager": "pnpm@11.1.2"
+}

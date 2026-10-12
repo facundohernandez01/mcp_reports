@@ -1,0 +1,44 @@
+# Creador v2 — no subir a GitHub
+
+# Dependencias (700MB+, se instalan con pnpm install)
+node_modules/
+.pnpm-store/
+
+# Secretos: NUNCA subir (ver .env.example como plantilla)
+.env
+.env*.local
+!.env.example
+
+# Builds y cachés
+dist/
+.astro/
+*.tsbuildinfo
+coverage/
+.next/
+out/
+
+# Datos locales y subidas (van en volúmenes docker, no en git)
+uploads/
+data/
+pgdata/
+*.sqlite
+*.tar.gz
+
+# Logs y stores
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# MCP efímero
+mcp-data/
+
+# Archivos de prueba locales
+balotaje_2023.csv
+zz-*.csv

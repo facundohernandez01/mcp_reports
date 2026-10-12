@@ -1,0 +1,126 @@
+# Creador v2: backend GraphQL + frontend estático + Postgres PROPIO.
+# Nada compartido con el stack viejo (que queda quieto como backup):
+# red propia, volumen propio, datos migrados (crud_db + creador_db).
+# NO es monolítico: backend (yoga ~30MB) + postgres + frontend estático.
+
+networks:
+  creador-net:
+    driver: bridge
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    # Piso bajo: shared_buffers 128→64MB y tope de conexiones (cada backend
+    # idle igual reserva). Ahorra ~70MB vs defaults sin impacto medible.
+    command: postgres -c shared_buffers=64MB -c max_connections=30
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-123123}
+      POSTGRES_DB: creador_db
+    volumes:
+      - creador_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - creador-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d creador_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./graphql-backend
+    ports:
+      - "4001:4001"
+    environment:
+      PORT: 4001
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-123123}
+      DB_NAME: creador_db
+      LEGACY_DB_NAME: crud_db
+      MSAL_ENABLED: ${MSAL_ENABLED:-ON}
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID:-}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4321}
+      DATASET_WORKER: ${DATASET_WORKER:-ON}
+      UPLOADS_DIR: /srv/uploads
+      NODE_OPTIONS: --max-old-space-size=256
+    volumes:
+      - creador_uploads:/srv/uploads
+    mem_limit: 512m
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - creador-net
+
+  # Frontend estático: build de Astro servido por nginx + /graphql al backend.
+  # Sin astro dev, sin Node en runtime, sin efímeros.
+  frontend:
+    build:
+      context: .
+      dockerfile: ./frontend/Dockerfile
+      args:
+        PUBLIC_GRAPHQL_URL: /graphql
+        PUBLIC_MSAL_ENABLED: ${MSAL_ENABLED:-ON}
+        PUBLIC_AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
+        PUBLIC_AZURE_TENANT_ID: ${AZURE_TENANT_ID:-}
+    ports:
+      - "5000:80" # :4321 lo usa `npm run dev` (:4000 lo retiene un proxy huerfano del stack viejo).
+    volumes:
+      - creador_uploads:/srv/uploads:ro
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - creador-net
+
+  # MCP sobre GraphQL (sin archivos ni builds): el agente crea reportes
+  # (spec JSON) y datasets vía API. Alcance limitado a reportes
+  # (ver mcp/AGENT_INSTRUCTIONS.md).
+  mcp:
+    build: ./mcp
+    ports:
+      - "4002:4002"
+    environment:
+      PORT: 4002
+      GQL_URL: http://backend:4001/graphql
+      MCP_API_KEY: ${MCP_API_KEY:-}
+      MCP_USER_EMAIL: ${MCP_USER_EMAIL:-dev@local}
+      # Clave del login propio del usuario de servicio (ver /admin/usuarios).
+      # Sin esto, con MSAL ON el MCP no puede llamar mutations (401).
+      MCP_USER_PASSWORD: ${MCP_USER_PASSWORD:-}
+      CHARTIA_EXTERNAL_BASE_URL: ${CHARTIA_EXTERNAL_BASE_URL:-http://localhost:4321}
+      # Base pública https://dominio para OAuth (issuer). Si se deja vacía usa
+      # CHARTIA_EXTERNAL_BASE_URL. Obligatoria para Claude web.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      # Superadmin (solo dueño): doble llave para admin_exec/admin_read.
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
+      SUPERADMIN_KEY: ${SUPERADMIN_KEY:-}
+    volumes:
+      # Repo montado en /work para las tools superadmin (lectura + shell).
+      # Sin SUPERADMIN_KEY las tools responden "deshabilitado".
+      - ./:/work:rw
+      # Socket de docker: permite rebuild/reinicio (equivale a root del host).
+      # Solo usable vía admin_exec tras SUPERADMIN_KEY.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # OAuth persistente (clientes/tokens sobreviven restarts).
+      - creador_oauth:/data
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - creador-net
+
+volumes:
+  creador_pgdata:
+  creador_uploads:
+  creador_oauth:

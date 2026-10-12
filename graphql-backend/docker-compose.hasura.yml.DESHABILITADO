@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  graphql-server:
+    image: hasura/graphql-engine:v2.40.0
+    ports:
+      - "8080:8080"
+    restart: always
+    environment:
+      # ⚠️ REEMPLAZA aquí con los datos de tu proxy de PostgreSQL actual
+      HASURA_GRAPHQL_DATABASE_URL: postgres://usuario:password@tu-proxy-psql:5432/tu_db
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+      HASURA_GRAPHQL_ADMIN_SECRET: "MiClaveSecretaGraphQL2026"
